@@ -1,4 +1,4 @@
-# ansible-plugin-cache-elasticsearch
+# STILL WORKING ON THIS, EXPECT MAJOR Changes
 Write all Ansible Cache-able variables to Elasticsearch
 
 Here is a basic ansible.cfg which set the Elasticsearch URI  which includes. The Index name to write the data to, and filter what varibles are sent.
