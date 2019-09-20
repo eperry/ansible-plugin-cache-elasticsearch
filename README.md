@@ -1,12 +1,13 @@
 # STILL WORKING ON THIS, EXPECT MAJOR Changes
-Write all Ansible Cache-able variables to Elasticsearch
+Write "Filteredlist of" any Ansible Cache-able variables to Elasticsearch
 Reading has not been implemented yet.
+
 
 {{CWD}}/plugins/cache/elasticsearch.py = plugin to write selected ansible varibles to elasticsearch
 {{CWD}}/plugins/cache/elasticsearch.ini = Configuration File for the plugin
 {{CWD}}/kibana-canvas.json = a default system canvas that reads ansible_cache index and gives you a summary.
 
-
+![Canvas](/images/Canvas.png)
 
 Here is a basic ansible.cfg which set the Elasticsearch URI  which includes. The Index name to write the data to, and filter what varibles are sent.
 
