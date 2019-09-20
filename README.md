@@ -7,7 +7,9 @@ Reading has not been implemented yet.
 {{CWD}}/plugins/cache/elasticsearch.ini = Configuration File for the plugin
 {{CWD}}/kibana-canvas.json = a default system canvas that reads ansible_cache index and gives you a summary.
 
-![Canvas](/images/Canvas.png)
+![Canvas](https://github.com/eperry/ansible-plugin-cache-elasticsearch/raw/master/images/Canvas.png)
+
+![Json](https://github.com/eperry/ansible-plugin-cache-elasticsearch/raw/master/images/json.png)
 
 Here is a basic ansible.cfg which set the Elasticsearch URI  which includes. The Index name to write the data to, and filter what varibles are sent.
 
