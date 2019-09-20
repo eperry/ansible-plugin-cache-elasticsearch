@@ -16,7 +16,7 @@ Reading has not been implemented yet.
 
 Here is a basic ansible.cfg which set the Elasticsearch URI  which includes. The Index name to write the data to, and filter what varibles are sent.
 
-# Configuration
+# Configuration Ansible
 
 ```
 [defaults]
@@ -25,19 +25,34 @@ stdout_callback=debug
 fact_caching = elasticsearch
 ```
 
-If field_filter is not passed as an argument then use these default values
+# Configration Elasticsarch.ini
+
+The Elasticearch.ini is expected to be in the same location as Elasticsearch.py
+
+{{CWD}}/plugins/cache/eleasticsearch.ini
+This is JSON format because it was quick and easy for me. 
+
 ```
-"ansible_hostname",
-"ansible_distribution",
-"ansible_distribution_version",
-"ansible_architecture",
-"ansible_product_serial",
-"ansible_product_name",
-"ansible_kernel",
-"ansible_memtotal_mb",
-"ansible_processor",
-"ansible_processor_cores",
-"ansible_processor_count",
-"ansible_processor_vcpus",
-"ansible_date_time"
+{
+"es_hostnames": ["localhost"],
+"es_port": 9200,
+"es_index": "ansible_cache",
+"field_filter": [
+                    "ansible_hostname",
+                    "ansible_distribution",
+                    "ansible_distribution_version",
+                    "ansible_architecture",
+                    "ansible_product_serial",
+                    "ansible_product_name",
+                    "ansible_kernel",
+                    "ansible_memtotal_mb",
+                    "ansible_processor",
+                    "ansible_processor_cores",
+                    "ansible_processor_count",
+                    "ansible_processor_vcpus",
+                    "ansible_date_time.iso8601_basic"
+                ]
+}
 ```
+
+
