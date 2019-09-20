@@ -8,6 +8,7 @@ import logging
 import pytz
 import time
 import json
+import functools
 
 DOCUMENTATION = '''
     cache: elasticsearch
@@ -72,19 +73,14 @@ class CacheModule(BaseCacheModule):
     def __init__(self,*args, **kwargs):
         logging.Formatter('[%(asctime)s] p%(process)s {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s','%m-%d %H:%M:%S')
         self.logger =  logging.getLogger('ansible logger')
-        #self.logger.setLevel(logging.DEBUG)
-        #self.es_logger = logging.getLogger('elasticsearch')
-        logging.basicConfig()
-        #logging.getLogger('elasticsearch').setLevel(logging.DEBUG)
-        #logging.getLogger('urllib3').setLevel(logging.DEBUG)
-        if C.CACHE_PLUGIN_CONNECTION:
-            self._uri = C.CACHE_PLUGIN_CONNECTION
-            self._uri_parsed = urlparse.urlparse(self._uri)
-            self._settings = urlparse.parse_qs(self._uri_parsed.query)
-            #ed=json.dumps(self._settings['field_filter'], sort_keys=True, indent=4)
-            #logging.error("ed %s" % ed)
-
-            
+        self.logger.setLevel(logging.ERROR)
+        cfgFile,ext = os.path.splitext(__file__)
+        cfgFile+=".ini"
+        try:
+          cfg= open(cfgFile,"r").read()
+          self._settings = json.loads(cfg)
+        except Exception as e:
+          logging.error("Failed %s",e)
         if C.CACHE_PLUGIN_TIMEOUT:
             self._timeout = float(C.CACHE_PLUGIN_TIMEOUT)
         if C.CACHE_PLUGIN_PREFIX:
@@ -100,15 +96,15 @@ class CacheModule(BaseCacheModule):
 
     def _connect(self):
         try:
-            self.es = self.elasticsearch.Elasticsearch('http://hd1delk01lx.digital.hbc.com:9205')
-        except Exception as e:
-            logging.error("Failed to connect elasticsearch server '%s' port %s. %s" % (self._uri_parsed.hostname, self._uri_parsed.port, e))
+            self.es = self.elasticsearch.Elasticsearch(self._settings['es_hostnames'], port=self._settings['es_port'])
+        except Exception as e: 
+            logging.error("Failed to connect elasticsearch server %s, %s",self._settings['es_hostnames'],e)
             return False
 
         try:
             return self.es.ping()
         except Exception:
-            logging.error("Failed to get ping from elasticsearch server '%s'.  " % (self._uri_parsed.hostname))
+            logging.error("Failed to get ping from elasticsearch server '%s' %s.  ", self._uri_parsed.hostname,e)
         return False
 
     def _make_key(self, key):
@@ -119,45 +115,33 @@ class CacheModule(BaseCacheModule):
         # Valid JSON is always UTF-8 encoded.
         with codecs.open("ansible_cache/"+value['ansible_hostname'], 'r', encoding='utf-7') as f:
             return json.load(f, cls=AnsibleJSONDecoder)
-    #    with codecs.open(filepath, 'r', encoding='utf-8') as f:
+
 
     def set(self, key, value):
-        #ed=json.dumps(value, sort_keys=True, indent=4)
-        #logging.error("ed %s" % ed)
-        #value['ansible_python']=""
-        #jd = json.dumps(value, cls=AnsibleJSONEncoder, sort_keys=True, indent=4)
-        #with codecs.open("ansible_cache/bob", 'w', encoding='utf-6') as f:
-        #    f.write(jd)
-        #field_filter=[
-            #"ansible_hostname",
-            #"ansible_distribution",
-            #"ansible_distribution_version",
-            #"ansible_architecture",
-            #"ansible_product_serial",
-            #"ansible_product_name",
-            #"ansible_kernel",
-            #"ansible_memtotal_mb",
-            #"ansible_processor",
-            #"ansible_processor_cores",
-            #"ansible_processor_count",
-            #"ansible_processor_vcpus",
-            #"ansible_local",
-            #"ansible_vmware",
-            #"ansible_date_time"
-                #]
+        def deepgetattr(obj, attr):
+            keys = attr.split('.')
+            return functools.reduce(lambda d, key: d.get(key) if d else None, keys, obj)
+
+        def deepsetattr(attr, val):
+            obj={}
+            if attr:
+               a = attr.pop(0)
+               obj[a] = deepsetattr(attr,val)
+               return obj
+            return val
         nval={}
-        for ff in self._settings['field_filter'][0].split(','):
-            if ff in value:
-                nval[ff] = value[ff];
+        for ff in self._settings['field_filter']:
+            attr = ff.split('.')
+            a = attr.pop(0)
+            nval[a] = deepsetattr(attr,deepgetattr(value,ff))
         jd = json.dumps(nval, cls=AnsibleJSONEncoder, sort_keys=True, indent=4)
         if self.es_status:
             try:
-              #result = self.helpers.helpers.bulk(self.es,{ "_index": "mywords", "_type": "document", "doc": value, }  ,index=self.index_name)
               result = self.es.index(index="ansible_cache", id=value['ansible_hostname'], body=jd, doc_type = "_doc" )
               if result:
                   return True
-            except Exception:
-                logging.error("Inserting data into elasticsearch 'failed' because " )
+            except Exception as e:
+                logging.error("Inserting data into elasticsearch 'failed' because %s ",e )
         return False
     def keys(self):
          return "bob"

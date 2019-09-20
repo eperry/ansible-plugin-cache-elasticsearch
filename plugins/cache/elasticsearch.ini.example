@@ -1,0 +1,26 @@
+######## COMMENTS ARE NOT VALID JSON this is only for descripting of the fields
+{
+#### PASSES list of hostnames which to connect to your elasticsearch cluster
+"es_hostnames": ["hostname"],
+#### Port Number your ELK cluster runs on
+"es_port": 9200,
+#### Name of the elasticsearch index to create/use
+"es_index": "ansible_cache",
+#### Fields which to send to ELK, I find that ansible creates thousands of fields (+5000 in my enviroment) this is just to many
+#### TODO, add ability to rename the field
+"field_filter": [
+                    "ansible_hostname",
+                    "ansible_distribution",
+                    "ansible_distribution_version",
+                    "ansible_architecture",
+                    "ansible_product_serial",
+                    "ansible_product_name",
+                    "ansible_kernel",
+                    "ansible_memtotal_mb",
+                    "ansible_processor",
+                    "ansible_processor_cores",
+                    "ansible_processor_count",
+                    "ansible_processor_vcpus",
+                    "ansible_date_time.iso8601_basic"
+                ]
+}
