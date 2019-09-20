@@ -1,10 +1,12 @@
 from __future__ import (absolute_import, division, print_function)
+from ansible.module_utils._text import to_native
+from ansible.utils.display import Display
+display = Display()
 __metaclass__ = type
 
 
 import os
 import json
-import logging
 import pytz
 import time
 import json
@@ -71,16 +73,16 @@ from ansible.plugins.cache import BaseCacheModule
 
 class CacheModule(BaseCacheModule):
     def __init__(self,*args, **kwargs):
-        logging.Formatter('[%(asctime)s] p%(process)s {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s','%m-%d %H:%M:%S')
-        self.logger =  logging.getLogger('ansible logger')
-        self.logger.setLevel(logging.ERROR)
         cfgFile,ext = os.path.splitext(__file__)
         cfgFile+=".ini"
+        display.v("Reading Plugin Config file '%s' " % cfgFile)
         try:
           cfg= open(cfgFile,"r").read()
+          display.vv("Config Values '%s' " % cfg)
           self._settings = json.loads(cfg)
         except Exception as e:
-          logging.error("Failed %s",e)
+          display.error("ERROR %s" % to_native(e))
+          raise AnsibleError('Error Reading %s : %s' % cfgFile,to_native(e))
         if C.CACHE_PLUGIN_TIMEOUT:
             self._timeout = float(C.CACHE_PLUGIN_TIMEOUT)
         if C.CACHE_PLUGIN_PREFIX:
@@ -91,20 +93,20 @@ class CacheModule(BaseCacheModule):
             self.db_import = True
         except ImportError:
             self.db_import = False
-            logging.error("Failed to import elasticsearch module. Maybe you can use pip to install!")
+            display.error("Failed to import elasticsearch module. Maybe you can use pip to install!")
+            raise AnsibleError('Failed to import elasticsearch module. Maybe you can use pip to install! %s' % to_native(e))
         self.es_status = self._connect()
 
     def _connect(self):
         try:
-            self.es = self.elasticsearch.Elasticsearch(self._settings['es_hostnames'], port=self._settings['es_port'])
+          self.es = self.elasticsearch.Elasticsearch(self._settings['es_hostnames'], port=self._settings['es_port'])
         except Exception as e: 
-            logging.error("Failed to connect elasticsearch server %s, %s",self._settings['es_hostnames'],e)
-            return False
+          display.error('error %s ' % to_native(e))
+          raise AnsibleError('Failed to connect to elasticsearch %s' % to_native(e))
 
-        try:
-            return self.es.ping()
-        except Exception:
-            logging.error("Failed to get ping from elasticsearch server '%s' %s.  ", self._uri_parsed.hostname,e)
+        if self.es.ping():
+           return True
+        display.error('failed to ping host %s' % self._settings['es_hostnames'] )
         return False
 
     def _make_key(self, key):
@@ -135,13 +137,15 @@ class CacheModule(BaseCacheModule):
             a = attr.pop(0)
             nval[a] = deepsetattr(attr,deepgetattr(value,ff))
         jd = json.dumps(nval, cls=AnsibleJSONEncoder, sort_keys=True, indent=4)
+        display.vvvv("Elasticsearch insert document '%s' " % jd)
         if self.es_status:
             try:
               result = self.es.index(index="ansible_cache", id=value['ansible_hostname'], body=jd, doc_type = "_doc" )
               if result:
                   return True
             except Exception as e:
-                logging.error("Inserting data into elasticsearch 'failed' because %s ",e )
+                display.error('Error failed to insert data to elasticsearch %s' % to_native(e))
+                raise AnsibleError('Error failed to insert data to elasticsearch %s' % to_native(e))
         return False
     def keys(self):
          return "bob"

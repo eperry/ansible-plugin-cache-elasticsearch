@@ -1,0 +1,6 @@
+- hosts: localhost
+  gather_facts: yes
+  tasks:
+  - name: "Debug test"
+    debug:
+      msg: "just a test"

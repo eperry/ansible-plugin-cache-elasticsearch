@@ -10,10 +10,10 @@ setup(name='plugins.cache.elasticsearch',
       install_requires=[
           'elasticsearch',
           'pytz',
-           'json',
-           'logging',
-           'pytz',
-           'time',
-           'json'
+          'json',
+          'logging',
+          'pytz',
+          'time',
+          'json'
       ],
       zip_safe=False)
