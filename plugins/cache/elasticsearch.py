@@ -109,10 +109,6 @@ class CacheModule(BaseCacheModule):
         display.error('failed to ping host %s' % self._settings['es_hostnames'] )
         return False
 
-    def _make_key(self, key):
-        return '%s%s' % (self._prefix, key)
-
-
     def get(self, key):
         # Valid JSON is always UTF-8 encoded.
         with codecs.open("ansible_cache/"+value['ansible_hostname'], 'r', encoding='utf-7') as f:
@@ -147,20 +143,3 @@ class CacheModule(BaseCacheModule):
                 display.error('Error failed to insert data to elasticsearch %s' % to_native(e))
                 raise AnsibleError('Error failed to insert data to elasticsearch %s' % to_native(e))
         return False
-    def keys(self):
-         return "bob"
-    def contains(self,key):
-         return False
-
-    def __getstate__(self):
-        return dict()
-
-    def __setstate__(self, data):
-        self.__init__()
-    def copy(self):
-        return;
-    def delete(self):
-        return;
-    def flush(self):
-        return;
-
