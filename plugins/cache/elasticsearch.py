@@ -7,10 +7,10 @@ __metaclass__ = type
 
 import os
 import json
-import pytz
-import time
-import json
+#import pytz
+#import time
 import functools
+import codecs
 
 DOCUMENTATION = '''
     cache: elasticsearch
@@ -58,14 +58,11 @@ DOCUMENTATION = '''
 '''
 
 
-from datetime import datetime
 from ansible import constants as C
-from ansible.plugins.callback import CallbackBase
+#from ansible.plugins.callback import CallbackBase
 
 
-import codecs
-import json
-import urlparse as urlparse
+
 
 from ansible.parsing.ajson import AnsibleJSONEncoder, AnsibleJSONDecoder
 from ansible.plugins.cache import BaseCacheModule
@@ -90,9 +87,7 @@ class CacheModule(BaseCacheModule):
         try:
             self.elasticsearch = __import__('elasticsearch')
             self.helpers = __import__('elasticsearch.helpers')
-            self.db_import = True
         except ImportError:
-            self.db_import = False
             display.error("Failed to import elasticsearch module. Maybe you can use pip to install!")
             raise AnsibleError('Failed to import elasticsearch module. Maybe you can use pip to install! %s' % to_native(e))
         self.es_status = self._connect()
@@ -105,6 +100,11 @@ class CacheModule(BaseCacheModule):
           raise AnsibleError('Failed to connect to elasticsearch %s' % to_native(e))
 
         if self.es.ping():
+           display.v("Elasticsearch Node %s is pingable", 
+                     json.dumps( self._settings['es_hostnames'], 
+                                 cls=AnsibleJSONEncoder, 
+                                 sort_keys=True,
+                                 indent=4))
            return True
         display.error('failed to ping host %s' % self._settings['es_hostnames'] )
         return False
