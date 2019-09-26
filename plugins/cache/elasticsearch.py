@@ -23,8 +23,8 @@ DOCUMENTATION = '''
     options:
       _uri:
         description:
-          - Elasticsearch Connection String URI http://<host>:<port>/?index=<indexname>
-        default: http://localhost:9200/?index=ansible_cache
+          - Not Used see ini settings
+        default: 
         required: True
         env:
           - name: ANSIBLE_CACHE_PLUGIN_CONNECTION
@@ -40,21 +40,13 @@ DOCUMENTATION = '''
             section: defaults
       _timeout:
         default: 86400
-        description: Expiration timeout in seconds for the cache plugin data
+        description: Not used 
         env:
           - name: ANSIBLE_CACHE_PLUGIN_TIMEOUT
         ini:
           - key: fact_caching_timeout
             section: defaults
         type: integer
-      _field_filter:
-        description: Comma seperated list of fields to publish to Elasticsearch
-        default: ansible_hostname,ansible_date_time
-        env:
-          - name: ANSIBLE_CACHE_PLUGIN_FIELD_FILTER
-        ini:
-          - key: fact_caching_field_filter
-            section: defaults
 '''
 
 
@@ -114,9 +106,12 @@ class CacheModule(BaseCacheModule):
 
 
     def get(self, key):
-        # Valid JSON is always UTF-8 encoded.
-        with codecs.open("ansible_cache/"+value['ansible_hostname'], 'r', encoding='utf-7') as f:
-            return json.load(f, cls=AnsibleJSONDecoder)
+        if hasattr(self._settings,"local_cache_directory"):
+           with codecs.open(self._settings['local_cache_directory']+"/"+value['ansible_hostname'], 'r', encoding='utf-7') as f:
+              return json.load(f, cls=AnsibleJSONDecoder)
+        else:
+            display.vvv("local_cach_directory not set skipping")
+
 
 
     def set(self, key, value):
@@ -138,20 +133,23 @@ class CacheModule(BaseCacheModule):
             a = attr.pop(0)
             nval[a] = deepsetattr(attr,deepgetattr(value,ff))
         jd = json.dumps(nval, cls=AnsibleJSONEncoder, sort_keys=True, indent=4)
-        display.vvvv("writing to file %s" % jd)
-        try:
-            if not os.path.exists("ansible_cache/"):
-               os.mkdir("ansible_cache")
-               with codecs.open("ansible_cache/"+value['ansible_hostname'], 'w', encoding='utf-8') as f:
-                  f.write(json.dumps(value, cls=AnsibleJSONEncoder, sort_keys=True, indent=4))
-        except Exception as e:
-          display.error("Error opening file for writing %s with error %s" % ( "ansible_cache/"+value['ansible_hostname'],to_native(e)))
-          raise AnsibleError('Error %s' % to_native(e))
+        if hasattr(self._settings,"local_cache_directory"):
+            display.vvv("writing to file %s" % jd)
+            try:
+                if not os.path.exists(self._settings['local_cache_directory']):
+                   os.mkdir(self._settings['local_cache_directory'])
+                with codecs.open(self._settings['local_cache_directory']+"/"+value['ansible_hostname'], 'w', encoding='utf-8') as f:
+                   f.write(json.dumps(value, cls=AnsibleJSONEncoder, sort_keys=True, indent=4))
+            except Exception as e:
+              display.error("Error opening file for writing %s with error %s" % ( self._settings['local_cache_directory']+"/"+value['ansible_hostname'],to_native(e)))
+              raise AnsibleError('Error %s' % to_native(e))
+        else:
+            display.vvv("local_cach_directory not set skipping")
 
         if self.es_status:
             try:
-              display.vvvv("Elasticsearch insert document '%s' " % jd)
-              result = self.es.index(index="ansible_cache", id=value['ansible_hostname'], body=jd, doc_type = "_doc" )
+              display.vvv("Elasticsearch insert document '%s' " % jd)
+              result = self.es.index(index=self._settings['es_index'], id=value['ansible_hostname'], body=jd, doc_type = "_doc" )
               if result:
                   return True
             except Exception as e:

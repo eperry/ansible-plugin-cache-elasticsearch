@@ -10,3 +10,4 @@
 # Ignore config
 elasticearch.ini
 inventory/hosts.work
+ansible_cache
