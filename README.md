@@ -36,6 +36,7 @@ This is JSON format because it was quick and easy for me.
 "es_hostnames": ["localhost"],
 "es_port": 9200,
 "es_index": "ansible_cache",
+"local_cache_directory": "directory name, if unset will disable local cache"
 "field_filter": [
                     "ansible_hostname",
                     "ansible_distribution",
