@@ -81,7 +81,7 @@ class CacheModule(BaseCacheModule):
           display.vv("Config Values '%s' " % cfg)
           self._settings = json.loads(cfg)
         except Exception as e:
-          display.error("ERROR %s" % to_native(e))
+          display.error("ERROR reading config %s" % to_native(e))
           raise AnsibleError('Error Reading %s : %s' % cfgFile,to_native(e))
         if C.CACHE_PLUGIN_TIMEOUT:
             self._timeout = float(C.CACHE_PLUGIN_TIMEOUT)
@@ -131,15 +131,26 @@ class CacheModule(BaseCacheModule):
                obj[a] = deepsetattr(attr,val)
                return obj
             return val
+
         nval={}
         for ff in self._settings['field_filter']:
             attr = ff.split('.')
             a = attr.pop(0)
             nval[a] = deepsetattr(attr,deepgetattr(value,ff))
         jd = json.dumps(nval, cls=AnsibleJSONEncoder, sort_keys=True, indent=4)
-        display.vvvv("Elasticsearch insert document '%s' " % jd)
+        display.vvvv("writing to file %s" % jd)
+        try:
+            if not os.path.exists("ansible_cache/"):
+               os.mkdir("ansible_cache")
+               with codecs.open("ansible_cache/"+value['ansible_hostname'], 'w', encoding='utf-8') as f:
+                  f.write(json.dumps(value, cls=AnsibleJSONEncoder, sort_keys=True, indent=4))
+        except Exception as e:
+          display.error("Error opening file for writing %s with error %s" % ( "ansible_cache/"+value['ansible_hostname'],to_native(e)))
+          raise AnsibleError('Error %s' % to_native(e))
+
         if self.es_status:
             try:
+              display.vvvv("Elasticsearch insert document '%s' " % jd)
               result = self.es.index(index="ansible_cache", id=value['ansible_hostname'], body=jd, doc_type = "_doc" )
               if result:
                   return True
