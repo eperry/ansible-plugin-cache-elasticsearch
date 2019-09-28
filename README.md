@@ -1,4 +1,4 @@
-# STILL WORKING ON THIS
+# It works well
 Write list of any Ansible Cache-able variables to Elasticsearch
 Reading has not been implemented yet.
 
