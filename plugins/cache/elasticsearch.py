@@ -52,16 +52,13 @@ DOCUMENTATION = '''
         type: integer
 '''
 
-
-
-
 class CacheModule(BaseCacheModule):
     def __init__(self,*args, **kwargs):
         cfgFile,ext = os.path.splitext(__file__)
         cfgFile+=".ini"
         display.v("Reading Plugin Config file '%s' " % cfgFile)
         try:
-	  fd = open(cfgFile, 'r')
+	  fd = open(cfgFile, 'r+')
 	  try:
           	cfg= fd.read()
           	display.vv("Config Values '%s' " % cfg)
@@ -87,6 +84,7 @@ class CacheModule(BaseCacheModule):
             self.db_import = False
             display.error("Failed to import elasticsearch module. Maybe you can use pip to install!")
             raise AnsibleError('Failed to import elasticsearch module. Maybe you can use pip to install! %s' % to_native(e))
+        self._cache = {}
         self.es_status = self._connect()
 
     def _connect(self):
@@ -101,29 +99,29 @@ class CacheModule(BaseCacheModule):
         display.error('failed to ping host %s' % self._settings['es_hostnames'] )
         return False
 
-    def _make_key(self, key):
-        return '%s%s' % (self._prefix, key)
-
-
     def get(self, key):
-        display.v(' self=%s key=%s' % (self,key))
-        if hasattr(self._settings,"local_cache_directory"):
-	   try:
-             fd = open(self._settings.local_cache_directory, 'r')
-	     js = json.loads(fd, cls=AnsibleJSONDecoder)
-           except Exception as e:
-		display.error("Error reading local cache directory %s: %s" % (self._settings.local_cache_directory, to_native(e.message)))
-                return json.load('{"json_local_cache_directory_read_error": "Error reading local cache" }')
-           finally:
-		fd.close()
-        else:
-            display.vvv("local_cach_directory not set skipping")
-            return json.load("{}")
-
+	display.v("in get function ")
+        cachefile = self._settings['local_cache_directory']+"/"+key 
+	display.vvv(" cache file = %s" % (  cachefile ))
+	try:
+	  fd = open(cachefile, 'r+')
+	  try:
+            self._cache[key] = json.loads(fd.read())
+          except Exception as e:
+	    display.error("Error reading cachefile %s : %s" % 
+			   (cachefile,
+                            to_native(e.message)))
+          finally:
+	    fd.close()
+	except Exception as e:
+	  display.vvv("Error opening cachefile %s " % ( cachefile ))
+	finally:
+          return self._cache.get(key)
 
 
     def set(self, key, value):
-        display.v(' key=%s val=%s' % (key,value))
+	display.v("in set function ")
+        #display.v(' key=%s val=%s' % (key,value))
         def deepgetattr(obj, attr):
             keys = attr.split('.')
             return functools.reduce(lambda d, key: d.get(key) if d else None, keys, obj)
@@ -142,7 +140,7 @@ class CacheModule(BaseCacheModule):
             a = attr.pop(0)
             nval[a] = deepsetattr(attr,deepgetattr(value,ff))
         jd = json.dumps(nval, cls=AnsibleJSONEncoder, sort_keys=True, indent=4)
-        if hasattr(self._settings,"local_cache_directory"):
+        if "local_cache_directory" in self._settings:
             display.vvv("writing to file %s" % jd)
             try:
                 if not os.path.exists(self._settings['local_cache_directory']):
@@ -161,7 +159,7 @@ class CacheModule(BaseCacheModule):
                                  to_native(e)))
 		raise AnsibleError('Error %s' % to_native(e))
         else:
-            display.vvv("local_cach_directory not set skipping")
+            display.vvv("local_cache_directory not set skipping")
 
         if self.es_status:
             try:
@@ -174,3 +172,43 @@ class CacheModule(BaseCacheModule):
                 raise AnsibleError('Error failed to insert data to elasticsearch %s' % to_native(e))
         return False
 
+    def keys(self):
+	display.v("in keys function %s" % json.dumps(self));
+        return self._cache.keys()
+    def contains(self, key):
+	display.v("in contains function return value %s" % 
+		("local_cache_directory" in self._settings 
+		and os.path.exists("%s/%s" % (self._settings['local_cache_directory'],key))))
+	#display.v("in contains function hasattribute retddurn %s %s" % 
+			#(to_native("local_cache_directory" in self._settings),
+        		#json.dumps(self._settings, cls=AnsibleJSONEncoder, sort_keys=True, indent=4)))
+        return ("local_cache_directory" in self._settings 
+                and os.path.exists("%s/%s" % (self._settings['local_cache_directory'],key)))
+
+
+    def delete(self, key):
+	display.error("delete function not fully implemented");
+        #TODO: need to delete from Elasticsearch
+        try:
+            del self._cache[key]
+        except KeyError:
+            pass
+        try:
+            os.remove("%s/%s" % (self._settings['local_cache_directory'], key))
+        except (OSError, IOError):
+            pass  # TODO: only pass on non existing?
+
+    def flush(self):
+	display.error("flush function not fully implemented");
+        #TODO: need to flush from Elasticsearch
+        self._cache = {}
+        for key in self.keys():
+            self.delete(key)
+
+    def copy(self):
+        #TODO: need to flush from Elasticsearch
+	display.error("copy function not fully implemented");
+        ret = dict()
+        for key in self.keys():
+            ret[key] = self.get(key)
+        return ret
