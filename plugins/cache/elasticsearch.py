@@ -13,7 +13,6 @@ __metaclass__ = type
 import os
 import json
 import functools
-import codecs
 import urlparse 
 
 DOCUMENTATION = '''
@@ -174,20 +173,4 @@ class CacheModule(BaseCacheModule):
                 display.error('Error failed to insert data to elasticsearch %s' % to_native(e))
                 raise AnsibleError('Error failed to insert data to elasticsearch %s' % to_native(e))
         return False
-    def keys(self):
-         return "bob"
-    def contains(self,key):
-         return False
-
-    def __getstate__(self):
-        return dict()
-
-    def __setstate__(self, data):
-        self.__init__()
-    def copy(self):
-        return;
-    def delete(self):
-        return;
-    def flush(self):
-        return;
 
