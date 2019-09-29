@@ -1,16 +1,20 @@
 from __future__ import (absolute_import, division, print_function)
 from ansible.module_utils._text import to_native
 from ansible.utils.display import Display
+from ansible.errors import AnsibleError, AnsibleParserError
+from ansible import constants as C
+from ansible.plugins.callback import CallbackBase
+from ansible.parsing.ajson import AnsibleJSONEncoder, AnsibleJSONDecoder
+from ansible.plugins.cache import BaseCacheModule
 display = Display()
 __metaclass__ = type
 
 
 import os
 import json
-import pytz
-import time
-import json
 import functools
+import codecs
+import urlparse 
 
 DOCUMENTATION = '''
     cache: elasticsearch
@@ -50,17 +54,6 @@ DOCUMENTATION = '''
 '''
 
 
-from datetime import datetime
-from ansible import constants as C
-from ansible.plugins.callback import CallbackBase
-
-
-import codecs
-import json
-import urlparse as urlparse
-
-from ansible.parsing.ajson import AnsibleJSONEncoder, AnsibleJSONDecoder
-from ansible.plugins.cache import BaseCacheModule
 
 
 class CacheModule(BaseCacheModule):
@@ -69,12 +62,20 @@ class CacheModule(BaseCacheModule):
         cfgFile+=".ini"
         display.v("Reading Plugin Config file '%s' " % cfgFile)
         try:
-          cfg= open(cfgFile,"r").read()
-          display.vv("Config Values '%s' " % cfg)
-          self._settings = json.loads(cfg)
+	  fd = open(cfgFile, 'r')
+	  try:
+          	cfg= fd.read()
+          	display.vv("Config Values '%s' " % cfg)
+          	self._settings = json.loads(cfg)
+	  except Exception as e:
+		display.error("ERROR reading config %s" % to_native(e))
+                raise AnsibleError('Error Reading %s : %s' % cfgFile,to_native(e))
+	  finally:
+	        fd.close()
         except Exception as e:
-          display.error("ERROR reading config %s" % to_native(e))
-          raise AnsibleError('Error Reading %s : %s' % cfgFile,to_native(e))
+          display.error("ERROR opening config %s" % to_native(e))
+	  raise AnsibleError('Error opening %s : %s' % (cfgFile,to_native(e)))
+
         if C.CACHE_PLUGIN_TIMEOUT:
             self._timeout = float(C.CACHE_PLUGIN_TIMEOUT)
         if C.CACHE_PLUGIN_PREFIX:
@@ -106,15 +107,24 @@ class CacheModule(BaseCacheModule):
 
 
     def get(self, key):
+        display.v(' self=%s key=%s' % (self,key))
         if hasattr(self._settings,"local_cache_directory"):
-           with codecs.open(self._settings['local_cache_directory']+"/"+value['ansible_hostname'], 'r', encoding='utf-7') as f:
-              return json.load(f, cls=AnsibleJSONDecoder)
+	   try:
+             fd = open(self._settings.local_cache_directory, 'r')
+	     js = json.loads(fd, cls=AnsibleJSONDecoder)
+           except Exception as e:
+		display.error("Error reading local cache directory %s: %s" % (self._settings.local_cache_directory, to_native(e.message)))
+                return json.load('{"json_local_cache_directory_read_error": "Error reading local cache" }')
+           finally:
+		fd.close()
         else:
             display.vvv("local_cach_directory not set skipping")
+            return json.load("{}")
 
 
 
     def set(self, key, value):
+        display.v(' key=%s val=%s' % (key,value))
         def deepgetattr(obj, attr):
             keys = attr.split('.')
             return functools.reduce(lambda d, key: d.get(key) if d else None, keys, obj)
@@ -138,11 +148,19 @@ class CacheModule(BaseCacheModule):
             try:
                 if not os.path.exists(self._settings['local_cache_directory']):
                    os.mkdir(self._settings['local_cache_directory'])
-                with codecs.open(self._settings['local_cache_directory']+"/"+value['ansible_hostname'], 'w', encoding='utf-8') as f:
-                   f.write(json.dumps(value, cls=AnsibleJSONEncoder, sort_keys=True, indent=4))
-            except Exception as e:
-              display.error("Error opening file for writing %s with error %s" % ( self._settings['local_cache_directory']+"/"+value['ansible_hostname'],to_native(e)))
-              raise AnsibleError('Error %s' % to_native(e))
+		fd = open(self._settings['local_cache_directory']+"/"+key, 'w')
+		js = json.dumps(value, cls= AnsibleJSONEncoder, sort_keys=True, indent=4)
+		try:
+                  fd.write(js)
+		except Exception as e:
+		  display.error(" Error writing %s to file: %s" % ( js, e.message))
+		finally:
+		  fd.close()
+	    except Exception as e:
+	        display.error("Error opening file for writing %s with error %s" % 
+                               ( self._settings['local_cache_directory']+"/"+key,
+                                 to_native(e)))
+		raise AnsibleError('Error %s' % to_native(e))
         else:
             display.vvv("local_cach_directory not set skipping")
 
