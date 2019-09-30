@@ -13,7 +13,6 @@ __metaclass__ = type
 import os
 import json
 import functools
-import urlparse 
 
 DOCUMENTATION = '''
     cache: elasticsearch
@@ -28,7 +27,7 @@ DOCUMENTATION = '''
         description:
           - Not Used see ini settings
         default: 
-        required: True
+        required: false
         env:
           - name: ANSIBLE_CACHE_PLUGIN_CONNECTION
         ini:
@@ -54,157 +53,246 @@ DOCUMENTATION = '''
 
 class CacheModule(BaseCacheModule):
     def __init__(self,*args, **kwargs):
+        #############################################
+        ####  Handle default way of configuring plugins even though we won't use it
+        #############################################
+        try:
+          super(CacheModule, self).__init__(*args, **kwargs)
+          self._uri     = self.get_option('_uri')
+          self._timeout = float(self.get_option('_timeout'))
+          self._prefix  = self.get_option('_prefix')
+        except KeyError:
+          display.deprecated('Rather than importing CacheModules directly, '
+                             'use ansible.plugins.loader.cache_loader', version='2.12')
+          self._uri     = C.CACHE_PLUGIN_CONNECTION
+          self._timeout = float(C.CACHE_PLUGIN_TIMEOUT)
+          self._prefix  = C.CACHE_PLUGIN_PREFIX
+        ##############################################################
+        #### Read default config file
+        #### TODO: Add _uri to provide alternate configuration file
+        ##############################################################
+        #### strip the excption of this file
         cfgFile,ext = os.path.splitext(__file__)
-        cfgFile+=".ini"
+	#### add new INI extention 
+        cfgFile    +=".ini"
         display.v("Reading Plugin Config file '%s' " % cfgFile)
         try:
+          #### Open the config file
 	  fd = open(cfgFile, 'r+')
+          #### Read the config file and assign to global varible
 	  try:
-          	cfg= fd.read()
-          	display.vv("Config Values '%s' " % cfg)
-          	self._settings = json.loads(cfg)
+            cfg = fd.read()
+            display.vv("Config Values '%s' " % cfg)
+            self._settings = json.loads(cfg)
 	  except Exception as e:
-		display.error("ERROR reading config %s" % to_native(e))
-                raise AnsibleError('Error Reading %s : %s' % cfgFile,to_native(e))
+            raise AnsibleError('Error Reading config file %s : %s' % cfgFile,to_native(e))
 	  finally:
-	        fd.close()
+	    fd.close()
         except Exception as e:
-          display.error("ERROR opening config %s" % to_native(e))
 	  raise AnsibleError('Error opening %s : %s' % (cfgFile,to_native(e)))
-
-        if C.CACHE_PLUGIN_TIMEOUT:
-            self._timeout = float(C.CACHE_PLUGIN_TIMEOUT)
-        if C.CACHE_PLUGIN_PREFIX:
-            self._prefix = C.CACHE_PLUGIN_PREFIX
+        ####################################################
+        #### Initialize Elasticsearch
+        ####################################################
         try:
-            self.elasticsearch = __import__('elasticsearch')
-            self.helpers = __import__('elasticsearch.helpers')
-            self.db_import = True
+          self.elasticsearch = __import__('elasticsearch')
+          self.helpers = __import__('elasticsearch.helpers')
         except ImportError:
-            self.db_import = False
-            display.error("Failed to import elasticsearch module. Maybe you can use pip to install!")
-            raise AnsibleError('Failed to import elasticsearch module. Maybe you can use pip to install! %s' % to_native(e))
+          raise AnsibleError('Failed to import elasticsearch module. Maybe you can use pip to install! %s' % to_native(e))
+        #####################################################
+        #### Initialize _cache file
+        #####################################################
         self._cache = {}
-        self.es_status = self._connect()
+        #####################################################
+        #### Create connection to the elasticsearch cluster
+        #####################################################
+        self.es = self._connect()
+        self._esping()
 
+    #########################################################
+    #### Connect to Elasticsearch cluster
+    #########################################################
     def _connect(self):
         try:
-          self.es = self.elasticsearch.Elasticsearch(self._settings['es_hostnames'], port=self._settings['es_port'])
+          return self.elasticsearch.Elasticsearch(self._settings['es_hostnames'], port=self._settings['es_port'])
         except Exception as e: 
-          display.error('error %s ' % to_native(e))
-          raise AnsibleError('Failed to connect to elasticsearch %s' % to_native(e))
+          raise AnsibleError('Failed to connect to elasticsearch %s %s %s' % 
+				(self._settings['es_hostnames'], 
+				 self._settings['es_port'],
+				 to_native(e)))
+	return _esping()
 
+    #########################################################
+    #### ping Elasticsearch cluster
+    #########################################################
+    def _esping(self):
         if self.es.ping():
            return True
-        display.error('failed to ping host %s' % self._settings['es_hostnames'] )
+        display.error('failed to ping host %s %s' % 
+                            ( self._settings['es_hostnames'], 
+                              self._settings['es_port']))
         return False
 
+    #########################################################
+    ####  Get Cache from local file or Elasticsearch cluster
+    #########################################################
     def get(self, key):
-	display.v("in get function ")
-        cachefile = self._settings['local_cache_directory']+"/"+key 
-	display.vvv(" cache file = %s" % (  cachefile ))
-	try:
-	  fd = open(cachefile, 'r+')
-	  try:
-            self._cache[key] = json.loads(fd.read())
-          except Exception as e:
-	    display.error("Error reading cachefile %s : %s" % 
-			   (cachefile,
-                            to_native(e.message)))
-          finally:
-	    fd.close()
-	except Exception as e:
-	  display.vvv("Error opening cachefile %s " % ( cachefile ))
-	finally:
-          return self._cache.get(key)
-
-
-    def set(self, key, value):
-	display.v("in set function ")
-        #display.v(' key=%s val=%s' % (key,value))
-        def deepgetattr(obj, attr):
-            keys = attr.split('.')
-            return functools.reduce(lambda d, key: d.get(key) if d else None, keys, obj)
-
-        def deepsetattr(attr, val):
-            obj={}
-            if attr:
-               a = attr.pop(0)
-               obj[a] = deepsetattr(attr,val)
-               return obj
-            return val
-
-        nval={}
-        for ff in self._settings['field_filter']:
-            attr = ff.split('.')
-            a = attr.pop(0)
-            nval[a] = deepsetattr(attr,deepgetattr(value,ff))
-        jd = json.dumps(nval, cls=AnsibleJSONEncoder, sort_keys=True, indent=4)
-        if "local_cache_directory" in self._settings:
-            display.vvv("writing to file %s" % jd)
-            try:
-                if not os.path.exists(self._settings['local_cache_directory']):
-                   os.mkdir(self._settings['local_cache_directory'])
-		fd = open(self._settings['local_cache_directory']+"/"+key, 'w')
-		js = json.dumps(value, cls= AnsibleJSONEncoder, sort_keys=True, indent=4)
+        #########################################################
+        #### OFFLINE Read from file  
+        #########################################################
+        if self._settings['testing_offline']:
+		cachefile = self._settings['local_cache_directory']+"/"+key 
+		display.error("OFFLINE: Caching local file %s" % cachefile)
+		display.vvv(" cache file = %s" % (  cachefile ))
 		try:
-                  fd.write(js)
+		  fd = open(cachefile, 'r+')
+		  try:
+		    js = fd.read()
+		    self._cache[key] = json.loads(js)
+		  except Exception as e:
+		    display.error("Error reading cachefile %s : %s" % 
+				   (cachefile,
+				    to_native(e.message)))
+		  finally:
+		    fd.close()
 		except Exception as e:
-		  display.error(" Error writing %s to file: %s" % ( js, e.message))
-		finally:
-		  fd.close()
+		  display.vvv("Error opening cachefile %s " % ( cachefile ))
+        else:
+          #######################################################
+          #### Read from Elasticsearch cluster
+          #########################################################
+	  display.error("TODO: Read from elasticsearch cluster")
+	return self._cache.get(key)
+
+    #########################################################
+    ####  SET Cache  local file and Elasticsearch cluster
+    #########################################################
+    def set(self, key, value):
+       #########################################################
+       ####  deep Get Attribute: process  dot notation 
+       #########################################################
+        def deepgetattr(obj, attr):
+          keys = attr.split('.')
+          return functools.reduce(lambda d, key: d.get(key) if d else None, keys, obj)
+
+       #########################################################
+       ####  deep Set Attribute: process  dot notation 
+       #########################################################
+        def deepsetattr(attr, val):
+          obj={}
+          if attr:
+            a = attr.pop(0)
+            obj[a] = deepsetattr(attr,val)
+            return obj
+          return val
+
+        #############################################
+	#### Unfiltered values json string
+        #############################################
+	js = json.dumps(value, cls= AnsibleJSONEncoder, sort_keys=True, indent=4)
+        #############################################
+        ### Wite Unfiltered data to local cache file
+        #############################################
+        if "local_cache_directory" in self._settings:
+          display.vvv("writing to file %s" % self._settings['local_cache_directory']+"/"+key )
+          try:
+            ### If path does not exist make it
+            if not os.path.exists(self._settings['local_cache_directory']):
+                   os.mkdirs(self._settings['local_cache_directory'])
+            ### Open cache file key should be the hostname from inventory
+	    fd = open(self._settings['local_cache_directory']+"/"+key, 'w')
+	    ### Write unfiltered data to cache file
+	    try:
+              fd.write(js)
 	    except Exception as e:
-	        display.error("Error opening file for writing %s with error %s" % 
-                               ( self._settings['local_cache_directory']+"/"+key,
-                                 to_native(e)))
-		raise AnsibleError('Error %s' % to_native(e))
+	      raise AnsibleError("Error writing date to file  %s with error %s" % 
+                         ( self._settings['local_cache_directory']+"/"+key,
+                           to_native(e)))
+	    finally:
+	      fd.close()
+	  except Exception as e:
+	    raise AnsibleError("Error opening file for writing %s with error %s" % 
+                         ( self._settings['local_cache_directory']+"/"+key,
+                           to_native(e)))
         else:
             display.vvv("local_cache_directory not set skipping")
+	#########################################################
+        ### Filter Cache data and send to Elasticsearch
+        #########################################################
+        if self._esping():
+	  filter_val={}
+          ### Filter fields
+	  for ff in self._settings['field_filter']:
+	    attr = ff.split('.')
+	    a = attr.pop(0)
+	    filter_val[a] = deepsetattr(attr,deepgetattr(value,ff))
 
-        if self.es_status:
-            try:
-              display.vvv("Elasticsearch insert document '%s' " % jd)
-              result = self.es.index(index=self._settings['es_index'], id=value['ansible_hostname'], body=jd, doc_type = "_doc" )
-              if result:
-                  return True
-            except Exception as e:
-                display.error('Error failed to insert data to elasticsearch %s' % to_native(e))
-                raise AnsibleError('Error failed to insert data to elasticsearch %s' % to_native(e))
+	  ### Convert the object json string
+	  jd = json.dumps(filter_val, cls=AnsibleJSONEncoder, sort_keys=True, indent=4)
+	  ########################################################
+          #%## Send json to Elasticsearch
+	  ########################################################
+          try:
+            display.vvv("Elasticsearch insert document id='%s' doc = '%s' " % ( value['ansible_hostname'] , jd ))
+            result = self.es.index(
+			index=self._settings['es_index'], 
+			id=value['ansible_hostname'], 
+			body=jd, doc_type = "_doc" )
+            if result:
+               return True
+          except Exception as e:
+            raise AnsibleError('Error failed to insert data to elasticsearch %s' % to_native(e))
         return False
 
+    #########################################################
+    ####  get the key for all caching objects
+    #########################################################
     def keys(self):
 	display.v("in keys function %s" % json.dumps(self));
         return self._cache.keys()
+
+    #########################################################
+    ####  Is there a Cacheable object available
+    #########################################################
     def contains(self, key):
-	display.v("in contains function return value %s" % 
-		("local_cache_directory" in self._settings 
-		and os.path.exists("%s/%s" % (self._settings['local_cache_directory'],key))))
-	#display.v("in contains function hasattribute retddurn %s %s" % 
-			#(to_native("local_cache_directory" in self._settings),
-        		#json.dumps(self._settings, cls=AnsibleJSONEncoder, sort_keys=True, indent=4)))
-        return ("local_cache_directory" in self._settings 
+        #####################################################
+        #### TODO: Search Elasticsearch index 
+        #####################################################
+        containsFileCache = ("local_cache_directory" in self._settings 
                 and os.path.exists("%s/%s" % (self._settings['local_cache_directory'],key)))
+	display.v("in contains function return value %s" % containsFileCache )
+        return containsFileCache
 
-
+    #########################################################
+    ####  Delete cacheable object
+    #########################################################
+    #TODO: need to delete from Elasticsearch
     def delete(self, key):
 	display.error("delete function not fully implemented");
-        #TODO: need to delete from Elasticsearch
+        #### Delete from memory cache
         try:
-            del self._cache[key]
+          del self._cache[key]
         except KeyError:
-            pass
+          pass
+        #### Felete from File cache
         try:
-            os.remove("%s/%s" % (self._settings['local_cache_directory'], key))
+          os.remove("%s/%s" % (self._settings['local_cache_directory'], key))
         except (OSError, IOError):
-            pass  # TODO: only pass on non existing?
+          pass  
+        #### TODO: need to delete from Elasticsearch
 
+    #########################################################
+    ####  flush cacheable objects: Wipe all cache values
+    #########################################################
     def flush(self):
 	display.error("flush function not fully implemented");
         #TODO: need to flush from Elasticsearch
         self._cache = {}
         for key in self.keys():
-            self.delete(key)
+          self.delete(key)
 
+    #########################################################
+    ####  copy cacheable objects
+    #########################################################
     def copy(self):
         #TODO: need to flush from Elasticsearch
 	display.error("copy function not fully implemented");
