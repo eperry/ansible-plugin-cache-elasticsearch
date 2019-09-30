@@ -1,6 +1,7 @@
 # It works well
-Write list of any Ansible Cache-able variables to Elasticsearch
-Reading has not been implemented yet.
+
+* Write list of any Ansible Cache-able variables to Elasticsearch
+* Reading has not been implemented yet.
 
 {{CWD}}/plugins/cache/elasticsearch.py = plugin to write selected ansible varibles to elasticsearch
 {{CWD}}/plugins/cache/elasticsearch.ini = Configuration File for the plugin
