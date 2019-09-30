@@ -1,7 +1,10 @@
 # It works well
 
-* Write list of any Ansible Cache-able variables to Elasticsearch
-* Reading has not been implemented yet.
+* TODO: delete elasticsearch
+* TODO: flush elasticsearch
+* COMPLETE: Get from Elasticsearch
+* COMPLETE: Set elasticsearch
+* COMPLETE: Local File cache option 
 
 # Files defined 
 {{CWD}}/plugins/cache/elasticsearch.py  = plugin to write selected ansible varibles to elasticsearch
