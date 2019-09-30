@@ -3,9 +3,20 @@
 * Write list of any Ansible Cache-able variables to Elasticsearch
 * Reading has not been implemented yet.
 
-{{CWD}}/plugins/cache/elasticsearch.py = plugin to write selected ansible varibles to elasticsearch
+# Files defined 
+{{CWD}}/plugins/cache/elasticsearch.py  = plugin to write selected ansible varibles to elasticsearch
 {{CWD}}/plugins/cache/elasticsearch.ini = Configuration File for the plugin
-{{CWD}}/kibana-canvas.json = a default system canvas that reads ansible_cache index and gives you a summary.
+{{CWD}}/kibana-canvas.json   = a default system canvas that reads ansible_cache index and gives you a summary.
+{{CWD}}/install-playbook.yml = install the prerequisites
+{{CWD}}/debug-playbook.yml   = test examples playbook
+
+# Installation
+
+There is one dependency and makes a copy of the ansible.cfg.example to asnible.cfg (For now)
+
+```
+ansible-playbook install-playbook.yml --ask-become-pass
+```
 
 # Kibana Canvas
 ![Canvas](https://github.com/eperry/ansible-plugin-cache-elasticsearch/raw/master/images/Canvas.png)

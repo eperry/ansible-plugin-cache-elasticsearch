@@ -13,7 +13,7 @@
 - hosts: localhost
   connection: local
   tasks:
-    name: "copy ansible.cfg.examle to ansible.cfg"
+  - name: "copy ansible.cfg.examle to ansible.cfg"
     copy:
       src: ansible.cfg.example
       dest: ansible.cfg
