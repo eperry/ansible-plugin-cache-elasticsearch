@@ -1,0 +1,19 @@
+- hosts: localhost
+  connection: local
+  become: true
+  tasks:
+  - name: "Install pip dependencies"
+    pip:
+      name: 
+      - elasticsearch
+      state: latest
+
+
+ 
+- hosts: localhost
+  connection: local
+  tasks:
+    name: "copy ansible.cfg.examle to ansible.cfg"
+    copy:
+      src: ansible.cfg.example
+      dest: ansible.cfg
