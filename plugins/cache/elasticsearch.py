@@ -238,7 +238,10 @@ class CacheModule(BaseCacheModule):
 			id=value['ansible_hostname'], 
 			body=jd, doc_type = "_doc" )
             if result:
-               return True
+	      display.vvv("Results %s" % json.dumps(result))
+              return True
+	    else:
+              display.error("Results %s" % json.dumps(result))
           except Exception as e:
             raise AnsibleError('Error failed to insert data to elasticsearch %s' % to_native(e))
         return False
@@ -267,13 +270,14 @@ class CacheModule(BaseCacheModule):
     #########################################################
     #TODO: need to delete from Elasticsearch
     def delete(self, key):
-	display.error("delete function not fully implemented");
         #### Delete from memory cache
         try:
           del self._cache[key]
         except KeyError:
           pass
+        ###########################
         #### Felete from File cache
+        ###########################
         try:
           os.remove("%s/%s" % (self._settings['local_cache_directory'], key))
         except (OSError, IOError):
