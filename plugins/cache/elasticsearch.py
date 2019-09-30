@@ -139,10 +139,10 @@ class CacheModule(BaseCacheModule):
         #########################################################
         #### OFFLINE Read from file  
         #########################################################
-        if self._settings['testing_offline']:
+        if self._settings['read_local_cache_directory']:
 		cachefile = self._settings['local_cache_directory']+"/"+key 
-		display.error("OFFLINE: Caching local file %s" % cachefile)
-		display.vvv(" cache file = %s" % (  cachefile ))
+		display.v("Skipping elasticserch read")
+		display.v("read_local_cache_directory: reading local file %s" % cachefile)
 		try:
 		  fd = open(cachefile, 'r+')
 		  try:
@@ -160,7 +160,16 @@ class CacheModule(BaseCacheModule):
           #######################################################
           #### Read from Elasticsearch cluster
           #########################################################
-	  display.error("TODO: Read from elasticsearch cluster")
+	  if self._esping():
+	    try:
+	      res = self.es.get(
+		    index=self._settings['es_index'], 
+		    doc_type='_doc', 
+		    id=key)
+	      self._cache[key] = res['_source']
+	    except Exception as e:
+	      display.v("Error getting doc from Elasticsearch %s %s" % ( to_native(e), to_native(res)))
+	display.v(to_native(self._cache.get(key)));
 	return self._cache.get(key)
 
     #########################################################
@@ -193,6 +202,7 @@ class CacheModule(BaseCacheModule):
         ### Wite Unfiltered data to local cache file
         #############################################
         if "local_cache_directory" in self._settings:
+          #write_local_cache_directory  is assumed not sure why you would turn it off if you set a cache directory
           display.vvv("writing to file %s" % self._settings['local_cache_directory']+"/"+key )
           try:
             ### If path does not exist make it
@@ -262,7 +272,7 @@ class CacheModule(BaseCacheModule):
         #####################################################
         containsFileCache = ("local_cache_directory" in self._settings 
                 and os.path.exists("%s/%s" % (self._settings['local_cache_directory'],key)))
-	display.v("in contains function return value %s" % containsFileCache )
+	display.vvv("contains function return value %s" % containsFileCache )
         return containsFileCache
 
     #########################################################

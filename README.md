@@ -52,7 +52,12 @@ This is JSON format because it was quick and easy for me.
 "######": "Elastic Search Index to save data",
 "es_index": "ansible_cache",
 "######": "directory name, if unset will disable local cache - relative to {{CWD}} or specify full path",
-"local_cache_directory": "ansible_cache"
+"local_cache_directory": "ansible_cache",
+"######": "Write data to local cache",
+"write_local_cache_directory": true,
+"######": "Read from local cache instead of elasticsearch good for offline testing",
+"read_local_cache_directory": true,
+"######": "Filter fields because ansible has many thousands of varibles which we don't need",
 "field_filter": [
                     "######": "All fields are optional",
                     "ansible_hostname",

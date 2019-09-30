@@ -3,4 +3,4 @@
   tasks:
   - name: "Debug test"
     debug:
-      var: ansible_env
+      msg: ansible_env

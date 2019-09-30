@@ -9,6 +9,10 @@
 #### Create a local cache version of the file. some what for debugging, paranoia, and well I like writing scripts against the file too
 #if commented out it will not write a local cache
 "local_cache_directory": "ansible_cache",
+#### Write data to local cache
+"write_local_cache_directory": true,
+#### Read from local cache instead of elasticsearch good for offline testing
+"read_local_cache_directory": true,
 #### Fields which to send to ELK, I find that ansible creates thousands of fields (+5000 in my enviroment) this is just to many
 #### TODO, add ability to rename the field
 "field_filter": [
