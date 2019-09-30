@@ -42,9 +42,8 @@ This is JSON format because it was quick and easy for me.
 "######": "directory name, if unset will disable local cache - relative to {{CWD}} or specify full path",
 "local_cache_directory": "ansible_cache"
 "field_filter": [
-                    "######": "required, used as a key for elasticsearch and local cache filename",
+                    "######": "All fields are optional",
                     "ansible_hostname",
-                    "######": "All other fields are optional",
                     "ansible_distribution",
                     "ansible_distribution_version",
                     "ansible_architecture",
@@ -56,7 +55,7 @@ This is JSON format because it was quick and easy for me.
                     "ansible_processor_cores",
                     "ansible_processor_count",
                     "ansible_processor_vcpus",
-                    "######": "Supported DOT notitation to only grab certain sub-fields",
+                    "######": "I even support BASIC DOT notitation to only grab certain sub-fields",
                     "ansible_date_time.iso8601_basic"
                 ]
 }
