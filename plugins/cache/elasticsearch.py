@@ -197,7 +197,7 @@ class CacheModule(BaseCacheModule):
           try:
             ### If path does not exist make it
             if not os.path.exists(self._settings['local_cache_directory']):
-                   os.mkdirs(self._settings['local_cache_directory'])
+                   os.makedirs(self._settings['local_cache_directory'],0755)
             ### Open cache file key should be the hostname from inventory
 	    fd = open(self._settings['local_cache_directory']+"/"+key, 'w')
 	    ### Write unfiltered data to cache file
