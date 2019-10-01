@@ -278,7 +278,6 @@ class CacheModule(BaseCacheModule):
     #########################################################
     ####  Delete cacheable object
     #########################################################
-    #TODO: need to delete from Elasticsearch
     def delete(self, key):
         #### Delete from memory cache
         try:
@@ -292,17 +291,24 @@ class CacheModule(BaseCacheModule):
           os.remove("%s/%s" % (self._settings['local_cache_directory'], key))
         except (OSError, IOError):
           pass  
-        #### TODO: need to delete from Elasticsearch
 
+	try:
+          if self._esping():
+	     res = self.es.delete( index=self._settings['es_index'], doc_type="_doc", id=key)
+	     #display.v("display result %s "% to_native(res))
+             
+	except Exception as e:
+	  raise AnsibleError('Error delete document from elasticsearch %s : %s' % ( key, to_native(e)))
+	pass
     #########################################################
     ####  flush cacheable objects: Wipe all cache values
     #########################################################
     def flush(self):
 	display.error("flush function not fully implemented");
         #TODO: need to flush from Elasticsearch
-        self._cache = {}
-        for key in self.keys():
+        for key in self._cache.keys():
           self.delete(key)
+        self._cache = {}
 
     #########################################################
     ####  copy cacheable objects
