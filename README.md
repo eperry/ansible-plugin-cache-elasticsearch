@@ -8,10 +8,15 @@
 
 # Files defined 
 {{CWD}}/plugins/cache/elasticsearch.py  = plugin to write selected ansible varibles to elasticsearch
+
 {{CWD}}/plugins/cache/elasticsearch.ini = Configuration File for the plugin
+
 {{CWD}}/kibana-canvas.json   = a default system canvas that reads ansible_cache index and gives you a summary.
+
 {{CWD}}/install-playbook.yml = install the prerequisites
+
 {{CWD}}/debug-playbook.yml   = test examples playbook
+
 
 # Installation
 
