@@ -44,7 +44,7 @@ stdout_callback=debug
 fact_caching = elasticsearch
 ```
 
-# Configration Elasticsarch.ini
+# Configuration Elasticsarch.ini
 
 The Elasticearch.ini is expected to be in the same location as Elasticsearch.py
 
