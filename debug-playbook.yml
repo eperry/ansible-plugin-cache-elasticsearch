@@ -1,5 +1,6 @@
 - hosts: all
   gather_facts: yes
+  serial: 20
   tasks:
   - name: "Debug test"
     debug:
